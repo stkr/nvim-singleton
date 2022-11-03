@@ -250,6 +250,11 @@ DWORD launch_server_instance(const config_params_t* config_params) {
 
   string args = "\"" + config_params->alacritty_path + "\" -e \"\\\"" + config_params->nvim_path 
       + "\\\" --listen \\\"" + config_params->nvim_pipe_path + "\\\"\"";
+
+  if (config_params->additional_nvim_args != "") {
+      args += " " + config_params->additional_nvim_args;
+  }
+
   LOG_DEBUG("    Commandline: [%s]", args.c_str());
 
   // Note: Even though this is supposed to not use the paren's (= this processes) console, 
