@@ -7,6 +7,7 @@
 #include <Windows.h>
 #include <iostream>
 #include <fstream>
+#include <algorithm>
 
 using namespace std;
 
@@ -325,6 +326,10 @@ void print_usage() {
     printf("            nvim server (see nvim --listen / nvim --server).      \n");
     printf("        line3: additional arguments to be passed to nvim.         \n");
     printf("                                                                  \n");
+    printf("    In order to be able to reliably detect running instance of    \n");
+    printf("    alacritty, the full path to the executable needs to be        \n");
+    printf("    specified.\n");
+    printf("                                                                  \n");
     printf("    Example config file:                                          \n");
     printf("        C:\\Program Files\\Alacritty\\alacritty.exe               \n");
     printf("        c:\\Program Files\\Neovim\\bin\\nvim.exe                  \n");
@@ -350,7 +355,12 @@ int main(int argc, const char *argv[]) {
   bool server_is_running = false;
   if (pid != 0) {
       string executable_path = get_executable_of_pid(pid);
-      if (executable_path == config_params.alacritty_path) {
+      std::transform(executable_path.begin(), executable_path.end(), executable_path.begin(),
+          [](unsigned char c) { return std::tolower(c); });
+      string alacritty_path_lc = config_params.alacritty_path;
+      std::transform(alacritty_path_lc.begin(), alacritty_path_lc.end(), alacritty_path_lc.begin(),
+          [](unsigned char c) { return std::tolower(c); });
+      if (executable_path == alacritty_path_lc) {
           server_is_running = true;
           focus_existing_window(pid);
       }
