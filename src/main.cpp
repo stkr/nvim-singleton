@@ -323,6 +323,7 @@ void print_usage() {
     printf("        line1: path to nvim                                       \n");
     printf("        line2: path to the named pipe to use for communication to \n");
     printf("            nvim server (see nvim --listen / nvim --server).      \n");
+    printf("        line3: additional arguments to be passed to nvim.         \n");
     printf("                                                                  \n");
     printf("    Example config file:                                          \n");
     printf("        C:\\Program Files\\Alacritty\\alacritty.exe               \n");
