@@ -8,6 +8,7 @@
 #include <iostream>
 #include <fstream>
 #include <algorithm>
+#include <vector>
 
 using namespace std;
 
@@ -300,7 +301,7 @@ void launch_client_instance(const config_params_t* config_params, string file_pa
 
   string args = "\"" + config_params->nvim_path + "\" --server \"" + config_params->nvim_pipe_path + "\" --remote \"" + file_path + "";
   LOG_DEBUG("    Commandline: [%s]", args.c_str());
-  CreateProcessW(NULL, widen(args).data(), NULL, NULL, FALSE, 0, NULL, NULL,
+  CreateProcessW(NULL, widen(args).data(), NULL, NULL, FALSE, CREATE_NO_WINDOW, NULL, NULL,
                 &si, &pi);
 
   CloseHandle(pi.hProcess);
@@ -336,45 +337,78 @@ void print_usage() {
     printf("        \\\\.\\pipe\\nvim-singleton                               \n");
 }
 
-int main(int argc, const char *argv[]) {
-    if (argc < 2) {
+
+int handle_commandline(const std::vector<string>& args) {
+    if (args.size() < 1) {
         print_usage();
-        exit(1);
+        return 1;
     }
-    
-    string first_arg = string(argv[1]);
+
+    string first_arg = args[0];
     if (first_arg == "-h" || first_arg == "--help") {
         print_usage();
+        return 1;
+    }
+
+    string config_path = get_config_path();
+    config_params_t config_params = parse_config_file(config_path);
+    string pid_path = get_pid_path();
+    DWORD pid = read_pid_from_file(pid_path);
+    bool server_is_running = false;
+    if (pid != 0) {
+        string executable_path = get_executable_of_pid(pid);
+        std::transform(executable_path.begin(), executable_path.end(), executable_path.begin(),
+            [](unsigned char c) { return std::tolower(c); });
+        string alacritty_path_lc = config_params.alacritty_path;
+        std::transform(alacritty_path_lc.begin(), alacritty_path_lc.end(), alacritty_path_lc.begin(),
+            [](unsigned char c) { return std::tolower(c); });
+        if (executable_path == alacritty_path_lc) {
+            server_is_running = true;
+            focus_existing_window(pid);
+        }
+    }
+
+    if (!server_is_running) {
+        // Launch a new alacritty + nvim instance and record the pid.
+        pid = launch_server_instance(&config_params);
+        write_pid_to_file(pid_path, pid);
+    }
+
+    launch_client_instance(&config_params, args[0]);
+    return 0;
+}
+
+
+int main(int argc, char** argv) {
+    std::vector<string> args;
+    // The first arg is the executable name, we skip it here as it useless and 
+    // also not included with /SUBSYSTEM:WINDOWS.
+    for (int i = 1; i < argc; i++) {
+        args.push_back(string(argv[i]));
+    }
+    return handle_commandline(args);
+}
+
+
+int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine, int nCmdShow)
+{
+
+    LPWSTR* argv;
+    int argc;
+    int i;
+
+    argv = CommandLineToArgvW(pCmdLine, &argc);
+    if (NULL == argv)
+    {
+        printf("CommandLineToArgvW failed\n");
         exit(1);
     }
 
-  string config_path = get_config_path();
-  config_params_t config_params = parse_config_file(config_path);
-  string pid_path = get_pid_path();
-  DWORD pid = read_pid_from_file(pid_path);
-  bool server_is_running = false;
-  if (pid != 0) {
-      string executable_path = get_executable_of_pid(pid);
-      std::transform(executable_path.begin(), executable_path.end(), executable_path.begin(),
-          [](unsigned char c) { return std::tolower(c); });
-      string alacritty_path_lc = config_params.alacritty_path;
-      std::transform(alacritty_path_lc.begin(), alacritty_path_lc.end(), alacritty_path_lc.begin(),
-          [](unsigned char c) { return std::tolower(c); });
-      if (executable_path == alacritty_path_lc) {
-          server_is_running = true;
-          focus_existing_window(pid);
-      }
-  } 
+    std::vector<string> args;
+    for (int i = 0; i < argc; i++) {
+        args.push_back(narrow(argv[i]));
+    }
+    LocalFree(argv);
 
-  if (! server_is_running) {
-      // Launch a new alacritty + nvim instance and record the pid.
-      pid = launch_server_instance(&config_params);
-      write_pid_to_file(pid_path, pid);
-  }
-
-  launch_client_instance(&config_params, string(argv[1]));
-
-#if NDEBUG
-  ShowWindow(::GetConsoleWindow(), SW_HIDE);
-#endif
+    return handle_commandline(args);
 }
