@@ -284,7 +284,7 @@ DWORD launch_server_instance(const config_params_t* config_params) {
 
   BOOL pipe_available = WaitNamedPipe(config_params->nvim_pipe_path.c_str(), NMPWAIT_WAIT_FOREVER);
   if (!pipe_available) {
-      LOG_DEBUG("    Error waiting for pipe at [%s]: Error %d", 
+      LOG_DEBUG("    Error waiting for pipe at [%s]: Error %lu", 
           config_params->nvim_pipe_path.c_str(), GetLastError());
   }
   return pid;
